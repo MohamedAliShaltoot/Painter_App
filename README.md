@@ -21,9 +21,8 @@ Designed for flexibility and creativity, the app offers a range of tools for fre
 - 🎚️ **Adjust Background Thickness** (lines, dots, etc.).
 
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## 🗃 App_Images
+---
 
 ![Painter Screenshot 1](assets/images/painter_1.jpg)
 ![Painter Screenshot 2](assets/images/painter_2.jpg)
