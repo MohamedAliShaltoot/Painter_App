@@ -25,10 +25,11 @@ For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
 
-assets/images/painter_1.jpg
-assets/images/painter_2.jpg
-assets/images/painter_3.jpg
-assets/images/painter_4.jpg
+![Painter Screenshot 1](assets/images/painter_1.jpg)
+![Painter Screenshot 2](assets/images/painter_2.jpg)
+![Painter Screenshot 3](assets/images/painter_3.jpg)
+![Painter Screenshot 4](assets/images/painter_4.jpg)
+
 ---
 
 ## 🚀 Getting Started
