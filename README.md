@@ -28,6 +28,7 @@ Designed for flexibility and creativity, the app offers a range of tools for fre
 ![Painter Screenshot 2](assets/images/painter_2.jpg)
 ![Painter Screenshot 3](assets/images/painter_3.jpg)
 ![Painter Screenshot 4](assets/images/painter_4.jpg)
+![Painter Screenshot 5](assets/images/painter_5.jpg)
 
 ---
 
