@@ -1,229 +1,17 @@
 // ignore_for_file: deprecated_member_use
-
 import 'package:flutter/material.dart';
+import 'package:painter_app/core/classes/drawing_painter.dart';
+import 'package:painter_app/core/classes/drawing_state.dart';
+import 'package:painter_app/core/classes/drawn_objects.dart';
+import 'package:painter_app/core/classes/undo_redo_manager.dart';
 import 'package:painter_app/core/enums/background_type.dart';
 import 'package:painter_app/core/enums/tool_type.dart';
-
+import 'package:painter_app/core/utils/app_assets.dart';
 import 'package:painter_app/core/utils/app_constants.dart';
 
 void main() {
   runApp(const MyDrawingApp());
 }
-
-// ===========================================================================
-// DATA MODELS
-// ===========================================================================
-
-@immutable
-class DrawnObject {
-  final List<Offset?> points;
-  final Color color;
-  final double width;
-  final double? fontSize;
-  final ToolType tool;
-  final String? text;
-  final Color? backgroundColor;
-
-  const DrawnObject({
-    required this.points,
-    required this.color,
-    required this.width,
-    required this.tool,
-    this.text,
-    this.backgroundColor,
-    this.fontSize,
-  });
-
-  // Lazy initialization of TextPainter for better performance
-  TextPainter? get textPainter {
-    if (tool != ToolType.text ||
-        text == null ||
-        points.isEmpty ||
-        points[0] == null) {
-      return null;
-    }
-
-    final painter = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: TextStyle(
-          color: color,
-          fontSize: fontSize ?? AppConstants.defaultFontSize,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    );
-    painter.layout();
-    return painter;
-  }
-
-  bool get isErasing => tool == ToolType.eraser;
-
-  // Serialization methods with better error handling
-  factory DrawnObject.fromJson(Map<String, dynamic> json) {
-    try {
-      final pointsList = json['points'] as List;
-      final points =
-          pointsList.map<Offset?>((p) {
-            if (p == null) return null;
-            return Offset(
-              (p['dx'] as num).toDouble(),
-              (p['dy'] as num).toDouble(),
-            );
-          }).toList();
-
-      final toolName = json['tool'] as String;
-      final tool = ToolType.values.firstWhere(
-        (e) => e.name == toolName,
-        orElse: () => ToolType.pencil,
-      );
-
-      return DrawnObject(
-        points: points,
-        color: Color(json['color'] as int),
-        width: (json['width'] as num).toDouble(),
-        tool: tool,
-        text: json['text'] as String?,
-        backgroundColor:
-            json['backgroundColor'] != null
-                ? Color(json['backgroundColor'] as int)
-                : null,
-        fontSize:
-            json['fontSize'] != null
-                ? (json['fontSize'] as num).toDouble()
-                : null,
-      );
-    } catch (e) {
-      throw FormatException('Invalid DrawnObject JSON: $e');
-    }
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'points':
-          points
-              .map((p) => p == null ? null : {'dx': p.dx, 'dy': p.dy})
-              .toList(),
-      'color': color.value,
-      'width': width,
-      'tool': tool.name,
-      'text': text,
-      'backgroundColor': backgroundColor?.value,
-      'fontSize': fontSize,
-    };
-  }
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    if (other is! DrawnObject) return false;
-
-    return points.length == other.points.length &&
-        color == other.color &&
-        width == other.width &&
-        tool == other.tool &&
-        text == other.text &&
-        backgroundColor == other.backgroundColor &&
-        fontSize == other.fontSize;
-  }
-
-  @override
-  int get hashCode {
-    return Object.hash(
-      points.length,
-      color,
-      width,
-      tool,
-      text,
-      backgroundColor,
-      fontSize,
-    );
-  }
-}
-
-// ===========================================================================
-// DRAWING STATE MANAGEMENT
-// ===========================================================================
-
-class DrawingState {
-  final List<DrawnObject> completedObjects;
-  final DrawnObject? currentDrawing;
-  final Offset? shapeStartPoint;
-
-  const DrawingState({
-    this.completedObjects = const [],
-    this.currentDrawing,
-    this.shapeStartPoint,
-  });
-
-  DrawingState copyWith({
-    List<DrawnObject>? completedObjects,
-    DrawnObject? currentDrawing,
-    Offset? shapeStartPoint,
-    bool clearCurrent = false,
-    bool clearStart = false,
-  }) {
-    return DrawingState(
-      completedObjects: completedObjects ?? this.completedObjects,
-      currentDrawing:
-          clearCurrent ? null : (currentDrawing ?? this.currentDrawing),
-      shapeStartPoint:
-          clearStart ? null : (shapeStartPoint ?? this.shapeStartPoint),
-    );
-  }
-}
-
-class UndoRedoManager {
-  final List<List<DrawnObject>> _undoStack = [];
-  final List<List<DrawnObject>> _redoStack = [];
-
-  bool get canUndo => _undoStack.length > 1;
-  bool get canRedo => _redoStack.isNotEmpty;
-
-  void saveState(List<DrawnObject> objects) {
-    if (_undoStack.isNotEmpty && _listEquals(objects, _undoStack.last)) {
-      return;
-    }
-
-    _undoStack.add(List.from(objects));
-    if (_undoStack.length > AppConstants.maxUndoRedoStates) {
-      _undoStack.removeAt(0);
-    }
-    _redoStack.clear();
-  }
-
-  List<DrawnObject>? undo() {
-    if (!canUndo) return null;
-
-    _redoStack.add(_undoStack.removeLast());
-    return List.from(_undoStack.last);
-  }
-
-  List<DrawnObject>? redo() {
-    if (!canRedo) return null;
-
-    final stateToRedo = _redoStack.removeLast();
-    _undoStack.add(stateToRedo);
-    return List.from(stateToRedo);
-  }
-
-  void clear() {
-    _undoStack.clear();
-    _redoStack.clear();
-  }
-
-  bool _listEquals(List<DrawnObject> a, List<DrawnObject> b) {
-    if (a.length != b.length) return false;
-    for (int i = 0; i < a.length; i++) {
-      if (a[i] != b[i]) return false;
-    }
-    return true;
-  }
-}
-
-// ===========================================================================
-// MAIN APP WIDGET
-// ===========================================================================
 
 class MyDrawingApp extends StatefulWidget {
   const MyDrawingApp({super.key});
@@ -245,7 +33,7 @@ class _MyDrawingAppState extends State<MyDrawingApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Flutter Drawing App',
+      title: AppStrings.appName,
       themeMode: _isDark ? ThemeMode.dark : ThemeMode.light,
       theme: ThemeData.light(useMaterial3: true),
       darkTheme: ThemeData.dark(useMaterial3: true),
@@ -253,10 +41,6 @@ class _MyDrawingAppState extends State<MyDrawingApp> {
     );
   }
 }
-
-// ===========================================================================
-// DRAWING PAGE WIDGET
-// ===========================================================================
 
 class DrawingPage extends StatefulWidget {
   final VoidCallback onToggleTheme;
@@ -296,7 +80,7 @@ class _DrawingPageState extends State<DrawingPage> {
   @override
   void initState() {
     super.initState();
-    _undoRedoManager.saveState(_drawingState.completedObjects);
+    _undoRedoManager.saveState(_drawingState.currentPageObjects);
   }
 
   @override
@@ -306,10 +90,7 @@ class _DrawingPageState extends State<DrawingPage> {
     super.dispose();
   }
 
-  // ===========================================================================
   // GESTURE HANDLERS
-  // ===========================================================================
-
   void _onPanStart(Offset position) {
     final effectiveColor =
         _selectedTool == ToolType.eraser ? Colors.transparent : _selectedColor;
@@ -319,16 +100,16 @@ class _DrawingPageState extends State<DrawingPage> {
             : _strokeWidth;
 
     if (_selectedTool == ToolType.pencil || _selectedTool == ToolType.eraser) {
+      final newDrawing = DrawnObject(
+        points: [position],
+        color: effectiveColor,
+        width: effectiveWidth,
+        tool: _selectedTool,
+        backgroundColor: _canvasBackgroundColor,
+      );
+
       setState(() {
-        _drawingState = _drawingState.copyWith(
-          currentDrawing: DrawnObject(
-            points: [position],
-            color: effectiveColor,
-            width: effectiveWidth,
-            tool: _selectedTool,
-            backgroundColor: _canvasBackgroundColor,
-          ),
-        );
+        _drawingState = _drawingState.copyWith(currentDrawing: newDrawing);
       });
     } else {
       setState(() {
@@ -341,9 +122,11 @@ class _DrawingPageState extends State<DrawingPage> {
     if (_drawingState.currentDrawing != null &&
         (_selectedTool == ToolType.pencil ||
             _selectedTool == ToolType.eraser)) {
-      setState(() {
-        _drawingState.currentDrawing!.points.add(position);
-      });
+      _drawingState.currentDrawing!.points.add(position);
+
+      if (mounted) {
+        setState(() {});
+      }
     }
   }
 
@@ -382,50 +165,59 @@ class _DrawingPageState extends State<DrawingPage> {
     });
   }
 
-  // ===========================================================================
   // DRAWING OPERATIONS
-  // ===========================================================================
-
   void _completeCurrentDrawing() {
-    final newObjects = List<DrawnObject>.from(_drawingState.completedObjects)
-      ..add(_drawingState.currentDrawing!);
+    if (_drawingState.currentDrawing == null) return;
+
+    final newPageObjects = List<DrawnObject>.from(
+      _drawingState.currentPageObjects,
+    )..add(_drawingState.currentDrawing!);
+
+    final newPages = List<List<DrawnObject>>.from(_drawingState.pages);
+    newPages[_drawingState.currentPageIndex] = newPageObjects;
 
     setState(() {
       _drawingState = _drawingState.copyWith(
-        completedObjects: newObjects,
+        pages: newPages,
         clearCurrent: true,
       );
     });
-    _undoRedoManager.saveState(newObjects);
+    _undoRedoManager.saveState(newPageObjects);
   }
 
   void _completeShape(Offset endPosition) {
+    if (_drawingState.shapeStartPoint == null) return;
+
     final points = [_drawingState.shapeStartPoint!, endPosition];
-    final newObjects = List<DrawnObject>.from(_drawingState.completedObjects)
-      ..add(
-        DrawnObject(
-          points: points,
-          color: _selectedColor,
-          width: _strokeWidth,
-          tool: _selectedTool,
-        ),
-      );
+    final newPageObjects = List<DrawnObject>.from(
+      _drawingState.currentPageObjects,
+    )..add(
+      DrawnObject(
+        points: points,
+        color: _selectedColor,
+        width: _strokeWidth,
+        tool: _selectedTool,
+      ),
+    );
+
+    final newPages = List<List<DrawnObject>>.from(_drawingState.pages);
+    newPages[_drawingState.currentPageIndex] = newPageObjects;
 
     setState(() {
-      _drawingState = _drawingState.copyWith(
-        completedObjects: newObjects,
-        clearStart: true,
-      );
+      _drawingState = _drawingState.copyWith(pages: newPages, clearStart: true);
     });
-    _undoRedoManager.saveState(newObjects);
+    _undoRedoManager.saveState(newPageObjects);
   }
 
   void _undo() {
     final previousState = _undoRedoManager.undo();
     if (previousState != null) {
+      final newPages = List<List<DrawnObject>>.from(_drawingState.pages);
+      newPages[_drawingState.currentPageIndex] = previousState;
+
       setState(() {
         _drawingState = _drawingState.copyWith(
-          completedObjects: previousState,
+          pages: newPages,
           clearCurrent: true,
           clearStart: true,
         );
@@ -438,9 +230,12 @@ class _DrawingPageState extends State<DrawingPage> {
   void _redo() {
     final nextState = _undoRedoManager.redo();
     if (nextState != null) {
+      final newPages = List<List<DrawnObject>>.from(_drawingState.pages);
+      newPages[_drawingState.currentPageIndex] = nextState;
+
       setState(() {
         _drawingState = _drawingState.copyWith(
-          completedObjects: nextState,
+          pages: newPages,
           clearCurrent: true,
           clearStart: true,
         );
@@ -451,9 +246,12 @@ class _DrawingPageState extends State<DrawingPage> {
   }
 
   void _clearCanvas() {
-    if (_drawingState.completedObjects.isNotEmpty) {
+    if (_drawingState.currentPageObjects.isNotEmpty) {
+      final newPages = List<List<DrawnObject>>.from(_drawingState.pages);
+      newPages[_drawingState.currentPageIndex] = [];
+
       setState(() {
-        _drawingState = const DrawingState();
+        _drawingState = _drawingState.copyWith(pages: newPages);
       });
       _undoRedoManager.saveState([]);
     } else {
@@ -461,10 +259,61 @@ class _DrawingPageState extends State<DrawingPage> {
     }
   }
 
-  // ===========================================================================
-  // TEXT INPUT DIALOG
-  // ===========================================================================
+  void _addNewPage() {
+    final newPages = List<List<DrawnObject>>.from(_drawingState.pages)..add([]);
 
+    setState(() {
+      _drawingState = _drawingState.copyWith(
+        pages: newPages,
+        currentPageIndex: _drawingState.pages.length,
+        clearCurrent: true,
+        clearStart: true,
+      );
+    });
+    _undoRedoManager.saveState([]);
+  }
+
+  void _deleteCurrentPage() {
+    if (_drawingState.pages.length <= 1) {
+      _showSnackbar('Cannot delete the last page.');
+      return;
+    }
+
+    final newPages = List<List<DrawnObject>>.from(_drawingState.pages);
+    newPages.removeAt(_drawingState.currentPageIndex);
+
+    final newIndex =
+        _drawingState.currentPageIndex > 0
+            ? _drawingState.currentPageIndex - 1
+            : 0;
+
+    setState(() {
+      _drawingState = _drawingState.copyWith(
+        pages: newPages,
+        currentPageIndex: newIndex,
+        clearCurrent: true,
+        clearStart: true,
+      );
+    });
+
+    _undoRedoManager.clear();
+    _showSnackbar('Page deleted successfully.');
+  }
+
+  void _changePage(int newIndex) {
+    if (newIndex >= 0 && newIndex < _drawingState.pages.length) {
+      setState(() {
+        _drawingState = _drawingState.copyWith(
+          currentPageIndex: newIndex,
+          clearCurrent: true,
+          clearStart: true,
+        );
+      });
+      _undoRedoManager.saveState(_drawingState.currentPageObjects);
+    }
+  }
+
+  // TEXT INPUT DIALOG
   Future<void> _showTextInputDialog(Offset position) async {
     _textController.clear();
     double currentFontSize = AppConstants.defaultFontSize;
@@ -488,7 +337,6 @@ class _DrawingPageState extends State<DrawingPage> {
                   const Text('Enter Text'),
                 ],
               ),
-
               titlePadding: const EdgeInsets.all(20),
               insetPadding: const EdgeInsets.symmetric(
                 horizontal: 20.0,
@@ -509,8 +357,8 @@ class _DrawingPageState extends State<DrawingPage> {
                       TextField(
                         controller: _textController,
                         focusNode: _textFocusNode,
-                        decoration: const InputDecoration(
-                          hintText: "Type here",
+                        decoration: InputDecoration(
+                          hintText: AppStrings.typeHere,
                           hintStyle: TextStyle(
                             color: Colors.grey,
                             fontSize: 16,
@@ -570,7 +418,7 @@ class _DrawingPageState extends State<DrawingPage> {
                     ),
                   ),
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
+                  child:  Text(AppStrings.cancel),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
@@ -587,7 +435,7 @@ class _DrawingPageState extends State<DrawingPage> {
                       'textColor': currentTextColor,
                     });
                   },
-                  child: const Text('Add'),
+                  child:  Text(AppStrings.addText),
                 ),
               ],
             );
@@ -605,32 +453,33 @@ class _DrawingPageState extends State<DrawingPage> {
   }
 
   void _addTextObject(Offset position, Map<String, dynamic> textData) {
-    final newObjects = List<DrawnObject>.from(_drawingState.completedObjects)
-      ..add(
-        DrawnObject(
-          points: [position],
-          color: textData['textColor'] as Color,
-          width: _strokeWidth,
-          tool: ToolType.text,
-          text: textData['text'] as String,
-          fontSize: textData['fontSize'] as double,
-        ),
-      );
+    final newPageObjects = List<DrawnObject>.from(
+      _drawingState.currentPageObjects,
+    )..add(
+      DrawnObject(
+        points: [position],
+        color: textData['textColor'] as Color,
+        width: _strokeWidth,
+        tool: ToolType.text,
+        text: textData['text'] as String,
+        fontSize: textData['fontSize'] as double,
+      ),
+    );
+
+    final newPages = List<List<DrawnObject>>.from(_drawingState.pages);
+    newPages[_drawingState.currentPageIndex] = newPageObjects;
 
     setState(() {
-      _drawingState = _drawingState.copyWith(completedObjects: newObjects);
+      _drawingState = _drawingState.copyWith(pages: newPages);
     });
-    _undoRedoManager.saveState(newObjects);
+    _undoRedoManager.saveState(newPageObjects);
   }
 
-  // ===========================================================================
   // UI BUILDERS
-  // ===========================================================================
-
   Widget _buildFontSizeSlider(double fontSize, ValueChanged<double> onChanged) {
     return Row(
       children: [
-        const Text('Font Size :'),
+         Text(AppStrings.fontSize),
         Expanded(
           child: Slider(
             autofocus: true,
@@ -640,14 +489,9 @@ class _DrawingPageState extends State<DrawingPage> {
             divisions: 50,
             label: fontSize.round().toString(),
             onChanged: onChanged,
-            activeColor: const Color.fromARGB(
-              255,
-              223,
-              39,
-              11,
-            ), // part selected
-            inactiveColor: Colors.transparent, //part remaining
-            thumbColor: Color.fromARGB(255, 4, 46, 118), // circle color
+            activeColor: const Color.fromARGB(255, 223, 39, 11),
+            inactiveColor: Colors.transparent,
+            thumbColor: const Color.fromARGB(255, 4, 46, 118),
             secondaryActiveColor: const Color.fromARGB(255, 4, 46, 118),
           ),
         ),
@@ -664,7 +508,7 @@ class _DrawingPageState extends State<DrawingPage> {
 
     return Row(
       children: [
-        const Text('Text Color :'),
+         Text(AppStrings.textColor),
         const SizedBox(width: 10),
         ...colors.map(
           (color) => Padding(
@@ -860,20 +704,17 @@ class _DrawingPageState extends State<DrawingPage> {
     }
   }
 
-  // ===========================================================================
-  // MAIN BUILD METHOD
-  // ===========================================================================
 
+  // MAIN BUILD METHOD
   @override
   Widget build(BuildContext context) {
-    bool isSelected = false;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Flutter Drawing App'),
+        title: const Text(AppStrings.appName),
         actions: [
           IconButton(
             onPressed: _undoRedoManager.canUndo ? _undo : null,
-            icon: Container(child: const Icon(Icons.undo_sharp)),
+            icon: const Icon(Icons.undo_sharp),
             tooltip: 'Undo',
           ),
           IconButton(
@@ -885,6 +726,16 @@ class _DrawingPageState extends State<DrawingPage> {
             onPressed: _clearCanvas,
             icon: const Icon(Icons.delete_forever),
             tooltip: 'Clear Canvas',
+          ),
+          IconButton(
+            onPressed: _addNewPage,
+            icon: const Icon(Icons.add),
+            tooltip: 'Add New Page',
+          ),
+          IconButton(
+            onPressed: _deleteCurrentPage,
+            icon: const Icon(Icons.delete_outline),
+            tooltip: 'Delete Current Page',
           ),
           IconButton(
             icon: Icon(widget.isDark ? Icons.light_mode : Icons.dark_mode),
@@ -907,37 +758,53 @@ class _DrawingPageState extends State<DrawingPage> {
           Expanded(
             child: RepaintBoundary(
               key: _repaintBoundaryKey,
-              child: Builder(
+              child: LayoutBuilder(
                 builder:
-                    (canvasContext) => GestureDetector(
-                      onPanStart:
-                          (details) => _onPanStart(
-                            (canvasContext.findRenderObject() as RenderBox)
-                                .globalToLocal(details.globalPosition),
-                          ),
-                      onPanUpdate:
-                          (details) => _onPanUpdate(
-                            (canvasContext.findRenderObject() as RenderBox)
-                                .globalToLocal(details.globalPosition),
-                          ),
-                      onPanEnd:
-                          (details) => _onPanEnd(
-                            (canvasContext.findRenderObject() as RenderBox)
-                                .globalToLocal(details.globalPosition),
-                          ),
-                      onTapDown:
-                          (details) => _onTapDown(
-                            (canvasContext.findRenderObject() as RenderBox)
-                                .globalToLocal(details.globalPosition),
-                          ),
-                      onTapUp:
-                          (details) => _onTapUp(
-                            (canvasContext.findRenderObject() as RenderBox)
-                                .globalToLocal(details.globalPosition),
-                          ),
+                    (context, constraints) => GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onPanStart: (details) {
+                        final renderBox =
+                            context.findRenderObject() as RenderBox;
+                        final localPosition = renderBox.globalToLocal(
+                          details.globalPosition,
+                        );
+                        _onPanStart(localPosition);
+                      },
+                      onPanUpdate: (details) {
+                        final renderBox =
+                            context.findRenderObject() as RenderBox;
+                        final localPosition = renderBox.globalToLocal(
+                          details.globalPosition,
+                        );
+                        _onPanUpdate(localPosition);
+                      },
+                      onPanEnd: (details) {
+                        final renderBox =
+                            context.findRenderObject() as RenderBox;
+                        final localPosition = renderBox.globalToLocal(
+                          details.globalPosition,
+                        );
+                        _onPanEnd(localPosition);
+                      },
+                      onTapDown: (details) {
+                        final renderBox =
+                            context.findRenderObject() as RenderBox;
+                        final localPosition = renderBox.globalToLocal(
+                          details.globalPosition,
+                        );
+                        _onTapDown(localPosition);
+                      },
+                      onTapUp: (details) {
+                        final renderBox =
+                            context.findRenderObject() as RenderBox;
+                        final localPosition = renderBox.globalToLocal(
+                          details.globalPosition,
+                        );
+                        _onTapUp(localPosition);
+                      },
                       child: CustomPaint(
                         painter: DrawingPainter(
-                          _drawingState.completedObjects,
+                          _drawingState.currentPageObjects,
                           _drawingState.currentDrawing,
                           _backgroundType,
                           _canvasBackgroundColor,
@@ -949,30 +816,72 @@ class _DrawingPageState extends State<DrawingPage> {
               ),
             ),
           ),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
+            ),
+            color: Theme.of(context).canvasColor,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  onPressed:
+                      _drawingState.currentPageIndex > 0
+                          ? () =>
+                              _changePage(_drawingState.currentPageIndex - 1)
+                          : null,
+                  icon: const Icon(Icons.arrow_back_ios),
+                  tooltip: 'Previous Page',
+                ),
+                Text(
+                  'Page ${_drawingState.currentPageIndex + 1} of ${_drawingState.pages.length}',
+                  style: const TextStyle(fontSize: 16),
+                ),
+                IconButton(
+                  onPressed:
+                      _drawingState.currentPageIndex <
+                              _drawingState.pages.length - 1
+                          ? () =>
+                              _changePage(_drawingState.currentPageIndex + 1)
+                          : null,
+                  icon: const Icon(Icons.arrow_forward_ios),
+                  tooltip: 'Next Page',
+                ),
+              ],
+            ),
+          ),
           if (_showControls) ...[
             const Divider(height: 1),
-            Container(
+            Card(
+              margin: EdgeInsets.zero,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.zero,
+              ),
               color: Theme.of(context).canvasColor,
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  _buildToolSelector(),
-                  const SizedBox(height: 8),
-                  _buildColorPalette(),
-                  const SizedBox(height: 8),
-                  _buildStrokeWidthSlider(),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Text('Background: '),
-                      _buildBackgroundTypeDropdown(),
-                      const Spacer(),
-                      const Text('Canvas Color: '),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  _buildBackgroundColorPalette(),
-                ],
+              elevation: 4,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    _buildToolSelector(),
+                    const SizedBox(height: 8),
+                    _buildColorPalette(),
+                    const SizedBox(height: 8),
+                    _buildStrokeWidthSlider(),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Text('Background: '),
+                        _buildBackgroundTypeDropdown(),
+                        const Spacer(),
+                        const Text('Canvas Color: '),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    _buildBackgroundColorPalette(),
+                  ],
+                ),
               ),
             ),
           ],
@@ -982,227 +891,4 @@ class _DrawingPageState extends State<DrawingPage> {
   }
 }
 
-// ===========================================================================
-// CUSTOM PAINTER
-// ===========================================================================
 
-class DrawingPainter extends CustomPainter {
-  final List<DrawnObject> completedObjects;
-  final DrawnObject? currentDrawing;
-  final BackgroundType backgroundType;
-  final Color canvasBackgroundColor;
-  final double backgroundSpacing;
-
-  DrawingPainter(
-    this.completedObjects,
-    this.currentDrawing,
-    this.backgroundType,
-    this.canvasBackgroundColor,
-    this.backgroundSpacing,
-  );
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Draw background
-    _drawBackground(canvas, size);
-
-    // Draw completed objects
-    for (final obj in completedObjects) {
-      _drawObject(canvas, obj);
-    }
-
-    // Draw current drawing
-    if (currentDrawing != null) {
-      _drawObject(canvas, currentDrawing!);
-    }
-  }
-
-  void _drawBackground(Canvas canvas, Size size) {
-    // Fill canvas with background color
-    final backgroundPaint = Paint()..color = canvasBackgroundColor;
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, size.width, size.height),
-      backgroundPaint,
-    );
-
-    if (backgroundType == BackgroundType.none) return;
-
-    final paint =
-        Paint()
-          ..color =
-              canvasBackgroundColor == Colors.white
-                  ? Colors.grey.withOpacity(0.3)
-                  : Colors.white.withOpacity(0.3)
-          ..strokeWidth = 1.0;
-
-    switch (backgroundType) {
-      case BackgroundType.grid:
-        _drawGrid(canvas, size, paint);
-        break;
-      case BackgroundType.dotted:
-        _drawDots(canvas, size, paint);
-        break;
-      case BackgroundType.lines:
-        _drawLines(canvas, size, paint);
-        break;
-      case BackgroundType.none:
-        break;
-    }
-  }
-
-  void _drawGrid(Canvas canvas, Size size, Paint paint) {
-    // Vertical lines
-    for (double x = 0; x <= size.width; x += backgroundSpacing) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-    }
-    // Horizontal lines
-    for (double y = 0; y <= size.height; y += backgroundSpacing) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-  }
-
-  void _drawDots(Canvas canvas, Size size, Paint paint) {
-    for (double x = backgroundSpacing; x < size.width; x += backgroundSpacing) {
-      for (
-        double y = backgroundSpacing;
-        y < size.height;
-        y += backgroundSpacing
-      ) {
-        canvas.drawCircle(Offset(x, y), 1.5, paint);
-      }
-    }
-  }
-
-  void _drawLines(Canvas canvas, Size size, Paint paint) {
-    for (
-      double y = backgroundSpacing;
-      y < size.height;
-      y += backgroundSpacing
-    ) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-  }
-
-  void _drawObject(Canvas canvas, DrawnObject obj) {
-    final paint =
-        Paint()
-          ..color = obj.color
-          ..strokeWidth = obj.width
-          ..strokeCap = StrokeCap.round
-          ..strokeJoin = StrokeJoin.round;
-
-    switch (obj.tool) {
-      case ToolType.pencil:
-        _drawPath(canvas, obj.points, paint..style = PaintingStyle.stroke);
-        break;
-      case ToolType.eraser:
-        _drawEraser(canvas, obj);
-        break;
-      case ToolType.line:
-        _drawLine(canvas, obj.points, paint..style = PaintingStyle.stroke);
-        break;
-      case ToolType.rectangle:
-        _drawRectangle(canvas, obj.points, paint..style = PaintingStyle.stroke);
-        break;
-      case ToolType.circle:
-        _drawCircle(canvas, obj.points, paint..style = PaintingStyle.stroke);
-        break;
-      case ToolType.text:
-        _drawText(canvas, obj);
-        break;
-    }
-  }
-
-  void _drawPath(Canvas canvas, List<Offset?> points, Paint paint) {
-    if (points.length < 2) return;
-
-    final path = Path();
-    Offset? lastPoint;
-
-    for (final point in points) {
-      if (point == null) {
-        lastPoint = null;
-        continue;
-      }
-
-      if (lastPoint == null) {
-        path.moveTo(point.dx, point.dy);
-      } else {
-        path.lineTo(point.dx, point.dy);
-      }
-      lastPoint = point;
-    }
-
-    canvas.drawPath(path, paint);
-  }
-
-  void _drawEraser(Canvas canvas, DrawnObject obj) {
-    final paint =
-        Paint()
-          ..color = obj.backgroundColor ?? Colors.white
-          ..strokeWidth = obj.width
-          ..strokeCap = StrokeCap.round
-          ..strokeJoin = StrokeJoin.round
-          ..style = PaintingStyle.stroke;
-
-    _drawPath(canvas, obj.points, paint);
-  }
-
-  void _drawLine(Canvas canvas, List<Offset?> points, Paint paint) {
-    if (points.length >= 2 && points[0] != null && points[1] != null) {
-      canvas.drawLine(points[0]!, points[1]!, paint);
-    }
-  }
-
-  void _drawRectangle(Canvas canvas, List<Offset?> points, Paint paint) {
-    if (points.length >= 2 && points[0] != null && points[1] != null) {
-      final rect = Rect.fromPoints(points[0]!, points[1]!);
-      canvas.drawRect(rect, paint);
-    }
-  }
-
-  void _drawCircle(Canvas canvas, List<Offset?> points, Paint paint) {
-    if (points.length >= 2 && points[0] != null && points[1] != null) {
-      final center = points[0]!;
-      final radius = (points[1]! - center).distance;
-      canvas.drawCircle(center, radius, paint);
-    }
-  }
-
-  void _drawText(Canvas canvas, DrawnObject obj) {
-    if (obj.points.isNotEmpty && obj.points[0] != null && obj.text != null) {
-      final textPainter = obj.textPainter;
-      if (textPainter != null) {
-        textPainter.paint(canvas, obj.points[0]!);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return oldDelegate != this;
-  }
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    if (other is! DrawingPainter) return false;
-
-    return completedObjects.length == other.completedObjects.length &&
-        currentDrawing == other.currentDrawing &&
-        backgroundType == other.backgroundType &&
-        canvasBackgroundColor == other.canvasBackgroundColor &&
-        backgroundSpacing == other.backgroundSpacing;
-  }
-
-  @override
-  int get hashCode {
-    return Object.hash(
-      completedObjects.length,
-      currentDrawing,
-      backgroundType,
-      canvasBackgroundColor,
-      backgroundSpacing,
-    );
-  }
-}

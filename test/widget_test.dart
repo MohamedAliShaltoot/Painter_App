@@ -7,7 +7,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:painter_app/improved_flutter_code.dart';
+import 'package:painter_app/main.dart';
 
 
 
