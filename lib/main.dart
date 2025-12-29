@@ -1,72 +1,10 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'dart:math';
-
-// ===========================================================================
-// ENUMS AND CONSTANTS (Moved outside for better organization)
-// ===========================================================================
-
-enum BackgroundType {
-  none('None', Icons.clear),
-  dotted('Dotted', Icons.more_horiz),
-  grid('Grid', Icons.grid_on),
-  lines('Lines', Icons.line_weight),
-  diagonalGrid('Diagonal Grid', Icons.grid_3x3),
-  starryNight('Starry Night', Icons.stars);
-
-  final String displayName;
-  final IconData icon;
-
-  const BackgroundType(this.displayName, this.icon);
-}
-
-enum ToolType {
-  pencil('Pencil', Icons.edit),
-  eraser('Eraser', Icons.layers_clear),
-  line('Line', Icons.show_chart),
-  rectangle('Rectangle', Icons.rectangle_outlined),
-  circle('Circle', Icons.circle_outlined),
-  text('Text', Icons.text_fields);
-
-  final String displayName;
-  final IconData icon;
-
-  const ToolType(this.displayName, this.icon);
-}
-
-class AppConstants {
-  static const double defaultStrokeWidth = 5.0;
-  static const double eraserMultiplier = 2.0;
-  static const double defaultFontSize = 24.0;
-  static const double minFontSize = 10.0;
-  static const double maxFontSize = 60.0;
-  static const double defaultBackgroundSpacing = 20.0;
-  static const int maxUndoRedoStates = 20;
-
-  static const List<Color> paletteColors = [
-    Colors.black,
-    Colors.red,
-    Colors.green,
-    Colors.blue,
-    Colors.yellow,
-    Colors.orange,
-    Colors.purple,
-    Colors.pink,
-    Colors.brown,
-  ];
-
-  static const List<Color> backgroundPaletteColors = [
-    Colors.white,
-    Color(0xFFE0E0E0),
-    Color(0xFFD4E6F1),
-    Color(0xFFD1F2EB),
-    Color(0xFFF9E79F),
-    Color(0xFFCCD1D1),
-  ];
-}
-
-// ===========================================================================
-// MAIN APP WIDGET
-// ===========================================================================
+import 'package:painter_app/core/enums/background_type.dart';
+import 'package:painter_app/core/enums/tool_type.dart';
+import 'package:painter_app/core/utils/app_constants.dart';
 
 void main() {
   runApp(const MyDrawingApp());
