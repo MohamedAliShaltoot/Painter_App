@@ -418,7 +418,7 @@ class _DrawingPageState extends State<DrawingPage> {
                     ),
                   ),
                   onPressed: () => Navigator.pop(context),
-                  child:  Text(AppStrings.cancel),
+                  child: Text(AppStrings.cancel),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
@@ -435,7 +435,7 @@ class _DrawingPageState extends State<DrawingPage> {
                       'textColor': currentTextColor,
                     });
                   },
-                  child:  Text(AppStrings.addText),
+                  child: Text(AppStrings.addText),
                 ),
               ],
             );
@@ -479,7 +479,7 @@ class _DrawingPageState extends State<DrawingPage> {
   Widget _buildFontSizeSlider(double fontSize, ValueChanged<double> onChanged) {
     return Row(
       children: [
-         Text(AppStrings.fontSize),
+        Text(AppStrings.fontSize),
         Expanded(
           child: Slider(
             autofocus: true,
@@ -508,7 +508,7 @@ class _DrawingPageState extends State<DrawingPage> {
 
     return Row(
       children: [
-         Text(AppStrings.textColor),
+        Text(AppStrings.textColor),
         const SizedBox(width: 10),
         ...colors.map(
           (color) => Padding(
@@ -698,12 +698,27 @@ class _DrawingPageState extends State<DrawingPage> {
 
   void _showSnackbar(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          duration: const Duration(seconds: 3),
+          showCloseIcon: true,
+          closeIconColor: Colors.red,
+          elevation: 6,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.only(left: 20, right: 1000, bottom: 10),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+          action: SnackBarAction(
+            label: 'OK',
+            textColor: Colors.green,
+            onPressed: () {
+             // ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            },
+          ),
+        ),
+      );
     }
   }
-
 
   // MAIN BUILD METHOD
   @override
@@ -713,34 +728,41 @@ class _DrawingPageState extends State<DrawingPage> {
         title: const Text(AppStrings.appName),
         actions: [
           IconButton(
+            onPressed: () {
+              _showSnackbar('This feature is under development.');
+            },
+            icon: const Icon(Icons.menu),
+            tooltip: AppStrings.appMenuToolTip,
+          ),
+          IconButton(
             onPressed: _undoRedoManager.canUndo ? _undo : null,
             icon: const Icon(Icons.undo_sharp),
-            tooltip: 'Undo',
+            tooltip: AppStrings.undoToolTip,
           ),
           IconButton(
             onPressed: _undoRedoManager.canRedo ? _redo : null,
             icon: const Icon(Icons.redo),
-            tooltip: 'Redo',
+            tooltip: AppStrings.redoToolTip,
           ),
           IconButton(
             onPressed: _clearCanvas,
-            icon: const Icon(Icons.delete_forever),
-            tooltip: 'Clear Canvas',
+            icon: const Icon(Icons.close),
+            tooltip: AppStrings.clearCanvasToolTip,
           ),
           IconButton(
             onPressed: _addNewPage,
             icon: const Icon(Icons.add),
-            tooltip: 'Add New Page',
+            tooltip: AppStrings.addNewPageToolTip,
           ),
           IconButton(
             onPressed: _deleteCurrentPage,
-            icon: const Icon(Icons.delete_outline),
-            tooltip: 'Delete Current Page',
+            icon: const Icon(Icons.delete),
+            tooltip: AppStrings.deleteCurrentPageToolTip,
           ),
           IconButton(
             icon: Icon(widget.isDark ? Icons.light_mode : Icons.dark_mode),
             onPressed: widget.onToggleTheme,
-            tooltip: 'Toggle Theme',
+            tooltip: AppStrings.toggleThemeToolTip,
           ),
           IconButton(
             icon: Icon(_showControls ? Icons.visibility_off : Icons.visibility),
@@ -749,7 +771,10 @@ class _DrawingPageState extends State<DrawingPage> {
                 _showControls = !_showControls;
               });
             },
-            tooltip: _showControls ? 'Hide Controls' : 'Show Controls',
+            tooltip:
+                _showControls
+                    ? AppStrings.hideControlsToolTip
+                    : AppStrings.showControlsToolTip,
           ),
         ],
       ),
@@ -890,5 +915,3 @@ class _DrawingPageState extends State<DrawingPage> {
     );
   }
 }
-
-
