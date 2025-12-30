@@ -1,5 +1,10 @@
 // ignore_for_file: deprecated_member_use
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:painter_app/core/bloc/drawing_cubit/drawing_cubit.dart';
+import 'package:painter_app/core/bloc/theme_cubit/theme_cubit.dart';
+import 'package:painter_app/core/bloc/tool_cubit/tool_cubit.dart';
+import 'package:painter_app/core/bloc/ui_cubit/ui_cubit.dart';
 import 'package:painter_app/core/classes/drawing_painter.dart';
 import 'package:painter_app/core/classes/drawing_state.dart';
 import 'package:painter_app/core/classes/drawn_objects.dart';
@@ -10,12 +15,12 @@ import 'package:painter_app/core/utils/app_assets.dart';
 import 'package:painter_app/core/utils/app_constants.dart';
 import 'package:window_manager/window_manager.dart';
 
-void main() async{
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await windowManager.ensureInitialized();
 
   WindowOptions windowOptions = const WindowOptions(
-    size: Size(800, 600),        // fixed size
+    size: Size(800, 600), // fixed size
     minimumSize: Size(800, 600), //prevent resizing smaller
     maximumSize: Size(1800, 1600), // prevent resizing larger
     center: true,
@@ -26,7 +31,17 @@ void main() async{
     await windowManager.show();
     await windowManager.focus();
   });
-  runApp(const MyDrawingApp());
+  runApp(
+    MultiBlocProvider(
+      providers: [
+        BlocProvider(create: (_) => ThemeCubit()),
+        BlocProvider(create: (_) => DrawingCubit()),
+        BlocProvider(create: (_) => ToolCubit()),
+        BlocProvider(create: (_) => UiCubit()),
+      ],
+      child: const MyDrawingApp(),
+    ),
+  );
 }
 
 class MyDrawingApp extends StatefulWidget {
@@ -37,36 +52,30 @@ class MyDrawingApp extends StatefulWidget {
 }
 
 class _MyDrawingAppState extends State<MyDrawingApp> {
-  bool _isDark = false;
-
-  void _toggleTheme() {
-    setState(() {
-      _isDark = !_isDark;
-    });
-  }
+ 
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: AppStrings.appName,
-      themeMode: _isDark ? ThemeMode.dark : ThemeMode.light,
-      theme: ThemeData.light(useMaterial3: true),
-      darkTheme: ThemeData.dark(useMaterial3: true),
-      home: DrawingPage(onToggleTheme: _toggleTheme, isDark: _isDark),
+    return BlocBuilder<ThemeCubit, ThemeMode>(
+      builder: (context, state) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: AppStrings.appName,
+          themeMode: state,
+          theme: ThemeData.light(useMaterial3: true),
+          darkTheme: ThemeData.dark(useMaterial3: true),
+          home: const DrawingPage(),
+        );
+      },
     );
   }
 }
 
 class DrawingPage extends StatefulWidget {
-  final VoidCallback onToggleTheme;
-  final bool isDark;
+
 
   const DrawingPage({
-    super.key,
-    required this.onToggleTheme,
-    required this.isDark,
-  });
+    super.key,});
 
   @override
   State<DrawingPage> createState() => _DrawingPageState();
@@ -728,7 +737,7 @@ class _DrawingPageState extends State<DrawingPage> {
             label: 'OK',
             textColor: Colors.green,
             onPressed: () {
-             // ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              // ScaffoldMessenger.of(context).hideCurrentSnackBar();
             },
           ),
         ),
@@ -775,10 +784,18 @@ class _DrawingPageState extends State<DrawingPage> {
             icon: const Icon(Icons.delete),
             tooltip: AppStrings.deleteCurrentPageToolTip,
           ),
-          IconButton(
-            icon: Icon(widget.isDark ? Icons.light_mode : Icons.dark_mode),
-            onPressed: widget.onToggleTheme,
-            tooltip: AppStrings.toggleThemeToolTip,
+          BlocBuilder<ThemeCubit, ThemeMode>(
+            builder: (context, state) {
+              return IconButton(
+                icon: Icon(
+                  state == ThemeMode.light ? Icons.light_mode : Icons.dark_mode,
+                ),
+                onPressed: () {
+                  context.read<ThemeCubit>().toggleTheme();
+                },
+                tooltip: AppStrings.toggleThemeToolTip,
+              );
+            },
           ),
           IconButton(
             icon: Icon(_showControls ? Icons.visibility_off : Icons.visibility),
