@@ -13,6 +13,7 @@ import 'package:painter_app/core/enums/background_type.dart';
 import 'package:painter_app/core/enums/tool_type.dart';
 import 'package:painter_app/core/utils/app_assets.dart';
 import 'package:painter_app/core/utils/app_constants.dart';
+import 'package:painter_app/core/utils/snackbar_helper.dart';
 import 'package:window_manager/window_manager.dart';
 
 void main() async {
@@ -52,8 +53,6 @@ class MyDrawingApp extends StatefulWidget {
 }
 
 class _MyDrawingAppState extends State<MyDrawingApp> {
- 
-
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<ThemeCubit, ThemeMode>(
@@ -72,10 +71,7 @@ class _MyDrawingAppState extends State<MyDrawingApp> {
 }
 
 class DrawingPage extends StatefulWidget {
-
-
-  const DrawingPage({
-    super.key,});
+  const DrawingPage({super.key});
 
   @override
   State<DrawingPage> createState() => _DrawingPageState();
@@ -248,7 +244,7 @@ class _DrawingPageState extends State<DrawingPage> {
         );
       });
     } else {
-      _showSnackbar('Nothing to undo.');
+      SnackBarHelper.show(context, message: 'Nothing to undo.');
     }
   }
 
@@ -266,7 +262,7 @@ class _DrawingPageState extends State<DrawingPage> {
         );
       });
     } else {
-      _showSnackbar('Nothing to redo.');
+      SnackBarHelper.show(context, message: 'Nothing to redo.');
     }
   }
 
@@ -280,7 +276,7 @@ class _DrawingPageState extends State<DrawingPage> {
       });
       _undoRedoManager.saveState([]);
     } else {
-      _showSnackbar('Canvas is already empty.');
+      SnackBarHelper.show(context, message: 'Canvas is already empty.');
     }
   }
 
@@ -300,7 +296,7 @@ class _DrawingPageState extends State<DrawingPage> {
 
   void _deleteCurrentPage() {
     if (_drawingState.pages.length <= 1) {
-      _showSnackbar('Cannot delete the last page.');
+       SnackBarHelper.show(context, message: 'Cannot delete the last page.');
       return;
     }
 
@@ -322,7 +318,7 @@ class _DrawingPageState extends State<DrawingPage> {
     });
 
     _undoRedoManager.clear();
-    _showSnackbar('Page deleted successfully.');
+    SnackBarHelper.show(context, message: 'Page deleted successfully.');
   }
 
   void _changePage(int newIndex) {
@@ -721,29 +717,6 @@ class _DrawingPageState extends State<DrawingPage> {
     );
   }
 
-  void _showSnackbar(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          duration: const Duration(seconds: 3),
-          showCloseIcon: true,
-          closeIconColor: Colors.red,
-          elevation: 6,
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.only(left: 20, right: 1000, bottom: 10),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          action: SnackBarAction(
-            label: 'OK',
-            textColor: Colors.green,
-            onPressed: () {
-              // ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            },
-          ),
-        ),
-      );
-    }
-  }
 
   // MAIN BUILD METHOD
   @override
@@ -754,7 +727,8 @@ class _DrawingPageState extends State<DrawingPage> {
         actions: [
           IconButton(
             onPressed: () {
-              _showSnackbar('This feature is under development.');
+              SnackBarHelper.show(context, message: 'This feature is under development.');
+             
             },
             icon: const Icon(Icons.menu),
             tooltip: AppStrings.appMenuToolTip,
