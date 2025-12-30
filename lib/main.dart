@@ -1,5 +1,10 @@
 // ignore_for_file: deprecated_member_use
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:painter_app/core/bloc/drawing_cubit/drawing_cubit.dart';
+import 'package:painter_app/core/bloc/theme_cubit/theme_cubit.dart';
+import 'package:painter_app/core/bloc/tool_cubit/tool_cubit.dart';
+import 'package:painter_app/core/bloc/ui_cubit/ui_cubit.dart';
 import 'package:painter_app/core/classes/drawing_painter.dart';
 import 'package:painter_app/core/classes/drawing_state.dart';
 import 'package:painter_app/core/classes/drawn_objects.dart';
@@ -8,14 +13,15 @@ import 'package:painter_app/core/enums/background_type.dart';
 import 'package:painter_app/core/enums/tool_type.dart';
 import 'package:painter_app/core/utils/app_assets.dart';
 import 'package:painter_app/core/utils/app_constants.dart';
+import 'package:painter_app/core/utils/snackbar_helper.dart';
 import 'package:window_manager/window_manager.dart';
 
-void main() async{
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await windowManager.ensureInitialized();
 
   WindowOptions windowOptions = const WindowOptions(
-    size: Size(800, 600),        // fixed size
+    size: Size(800, 600), // fixed size
     minimumSize: Size(800, 600), //prevent resizing smaller
     maximumSize: Size(1800, 1600), // prevent resizing larger
     center: true,
@@ -26,7 +32,17 @@ void main() async{
     await windowManager.show();
     await windowManager.focus();
   });
-  runApp(const MyDrawingApp());
+  runApp(
+    MultiBlocProvider(
+      providers: [
+        BlocProvider(create: (_) => ThemeCubit()),
+        BlocProvider(create: (_) => DrawingCubit()),
+        BlocProvider(create: (_) => ToolCubit()),
+        BlocProvider(create: (_) => UiCubit()),
+      ],
+      child: const MyDrawingApp(),
+    ),
+  );
 }
 
 class MyDrawingApp extends StatefulWidget {
@@ -37,36 +53,25 @@ class MyDrawingApp extends StatefulWidget {
 }
 
 class _MyDrawingAppState extends State<MyDrawingApp> {
-  bool _isDark = false;
-
-  void _toggleTheme() {
-    setState(() {
-      _isDark = !_isDark;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: AppStrings.appName,
-      themeMode: _isDark ? ThemeMode.dark : ThemeMode.light,
-      theme: ThemeData.light(useMaterial3: true),
-      darkTheme: ThemeData.dark(useMaterial3: true),
-      home: DrawingPage(onToggleTheme: _toggleTheme, isDark: _isDark),
+    return BlocBuilder<ThemeCubit, ThemeMode>(
+      builder: (context, state) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: AppStrings.appName,
+          themeMode: state,
+          theme: ThemeData.light(useMaterial3: true),
+          darkTheme: ThemeData.dark(useMaterial3: true),
+          home: const DrawingPage(),
+        );
+      },
     );
   }
 }
 
 class DrawingPage extends StatefulWidget {
-  final VoidCallback onToggleTheme;
-  final bool isDark;
-
-  const DrawingPage({
-    super.key,
-    required this.onToggleTheme,
-    required this.isDark,
-  });
+  const DrawingPage({super.key});
 
   @override
   State<DrawingPage> createState() => _DrawingPageState();
@@ -239,7 +244,7 @@ class _DrawingPageState extends State<DrawingPage> {
         );
       });
     } else {
-      _showSnackbar('Nothing to undo.');
+      SnackBarHelper.show(context, message: 'Nothing to undo.');
     }
   }
 
@@ -257,7 +262,7 @@ class _DrawingPageState extends State<DrawingPage> {
         );
       });
     } else {
-      _showSnackbar('Nothing to redo.');
+      SnackBarHelper.show(context, message: 'Nothing to redo.');
     }
   }
 
@@ -271,7 +276,7 @@ class _DrawingPageState extends State<DrawingPage> {
       });
       _undoRedoManager.saveState([]);
     } else {
-      _showSnackbar('Canvas is already empty.');
+      SnackBarHelper.show(context, message: 'Canvas is already empty.');
     }
   }
 
@@ -291,7 +296,7 @@ class _DrawingPageState extends State<DrawingPage> {
 
   void _deleteCurrentPage() {
     if (_drawingState.pages.length <= 1) {
-      _showSnackbar('Cannot delete the last page.');
+       SnackBarHelper.show(context, message: 'Cannot delete the last page.');
       return;
     }
 
@@ -313,7 +318,7 @@ class _DrawingPageState extends State<DrawingPage> {
     });
 
     _undoRedoManager.clear();
-    _showSnackbar('Page deleted successfully.');
+    SnackBarHelper.show(context, message: 'Page deleted successfully.');
   }
 
   void _changePage(int newIndex) {
@@ -712,29 +717,6 @@ class _DrawingPageState extends State<DrawingPage> {
     );
   }
 
-  void _showSnackbar(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          duration: const Duration(seconds: 3),
-          showCloseIcon: true,
-          closeIconColor: Colors.red,
-          elevation: 6,
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.only(left: 20, right: 1000, bottom: 10),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          action: SnackBarAction(
-            label: 'OK',
-            textColor: Colors.green,
-            onPressed: () {
-             // ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            },
-          ),
-        ),
-      );
-    }
-  }
 
   // MAIN BUILD METHOD
   @override
@@ -745,7 +727,8 @@ class _DrawingPageState extends State<DrawingPage> {
         actions: [
           IconButton(
             onPressed: () {
-              _showSnackbar('This feature is under development.');
+              SnackBarHelper.show(context, message: 'This feature is under development.');
+             
             },
             icon: const Icon(Icons.menu),
             tooltip: AppStrings.appMenuToolTip,
@@ -775,10 +758,18 @@ class _DrawingPageState extends State<DrawingPage> {
             icon: const Icon(Icons.delete),
             tooltip: AppStrings.deleteCurrentPageToolTip,
           ),
-          IconButton(
-            icon: Icon(widget.isDark ? Icons.light_mode : Icons.dark_mode),
-            onPressed: widget.onToggleTheme,
-            tooltip: AppStrings.toggleThemeToolTip,
+          BlocBuilder<ThemeCubit, ThemeMode>(
+            builder: (context, state) {
+              return IconButton(
+                icon: Icon(
+                  state == ThemeMode.light ? Icons.light_mode : Icons.dark_mode,
+                ),
+                onPressed: () {
+                  context.read<ThemeCubit>().toggleTheme();
+                },
+                tooltip: AppStrings.toggleThemeToolTip,
+              );
+            },
           ),
           IconButton(
             icon: Icon(_showControls ? Icons.visibility_off : Icons.visibility),
