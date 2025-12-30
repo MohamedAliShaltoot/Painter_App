@@ -8,8 +8,24 @@ import 'package:painter_app/core/enums/background_type.dart';
 import 'package:painter_app/core/enums/tool_type.dart';
 import 'package:painter_app/core/utils/app_assets.dart';
 import 'package:painter_app/core/utils/app_constants.dart';
+import 'package:window_manager/window_manager.dart';
 
-void main() {
+void main() async{
+  WidgetsFlutterBinding.ensureInitialized();
+  await windowManager.ensureInitialized();
+
+  WindowOptions windowOptions = const WindowOptions(
+    size: Size(800, 600),        // fixed size
+    minimumSize: Size(800, 600), //prevent resizing smaller
+    maximumSize: Size(1800, 1600), // prevent resizing larger
+    center: true,
+    title: "My Flutter App",
+  );
+
+  windowManager.waitUntilReadyToShow(windowOptions, () async {
+    await windowManager.show();
+    await windowManager.focus();
+  });
   runApp(const MyDrawingApp());
 }
 
